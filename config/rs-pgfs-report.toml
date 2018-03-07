@@ -1,0 +1,23 @@
+[general]
+# optional
+log_conf_path = "./config/rs-pgfs-report-log.yml"
+lock_file = "/var/lock/rs-pgfs-report.lock"
+# optional
+repeat_delay = "5 s"
+
+[fluentd]
+address = "localhost:24224"
+tag = "app.rs_pgfs_report"
+# retry_interval = exp ** (multiplier + try_count)
+# https://github.com/jimmycuadra/retry/blob/v0.4.0/src/lib.rs#L142-L143
+try_count = 1
+multiplier = 1
+# file path to store records when failing to send into Fluent server
+store_file_path = "/tmp/.rs-pgfs-report-store-file-path"
+
+[pg]
+# postgresql://user[:password]@host[:port][/database][?param1=val1[[&param2=val2]...]]
+connection_url = "postgresql://user:pw@localhost:5432"
+
+[system]
+estimated_cap = 107374182400

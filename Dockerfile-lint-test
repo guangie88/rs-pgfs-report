@@ -1,0 +1,12 @@
+FROM guangie88/rustfmt-clippy:nightly-2018-02-26
+
+WORKDIR /app
+COPY ./Cargo.toml ./Cargo.lock ./rustfmt.toml ./
+
+RUN set -x \
+    && cargo fetch --locked -v
+
+COPY ./src/ ./src/
+
+RUN cargo clippy \
+    && cargo test --no-run

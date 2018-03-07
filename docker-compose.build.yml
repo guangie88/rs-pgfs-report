@@ -1,0 +1,51 @@
+version: '2'
+services:
+  check:
+    image: 'clux/muslrust:nightly-2018-02-26'
+    command:
+      - cargo
+      - check
+    volumes:
+      - '.:/volume'
+    env_file: .env
+  fmt:
+    image: 'guangie88/rustfmt-clippy:nightly-2018-02-26'
+    command:
+      - cargo
+      - fmt
+    volumes:
+      - '.:/volume'
+    env_file: .env
+  clippy:
+    image: 'guangie88/rustfmt-clippy:nightly-2018-02-26'
+    command:
+      - cargo
+      - clippy
+    volumes:
+      - '.:/volume'
+    env_file: .env
+  build-debug:
+    image: 'clux/muslrust:nightly-2018-02-26'
+    command:
+      - cargo
+      - build
+    volumes:
+      - '.:/volume'
+    env_file: .env
+  build:
+    image: 'clux/muslrust:nightly-2018-02-26'
+    command:
+      - cargo
+      - build
+      - '--release'
+    volumes:
+      - '.:/volume'
+    env_file: .env
+  clean:
+    image: 'clux/muslrust:nightly-2018-02-26'
+    command:
+      - cargo
+      - clean
+    volumes:
+      - '.:/volume'
+    env_file: .env
