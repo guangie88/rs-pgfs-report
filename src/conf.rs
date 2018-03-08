@@ -1,3 +1,4 @@
+use secstr::SecStr;
 use serde_humantime;
 use std::time::Duration;
 
@@ -38,7 +39,8 @@ pub struct GeneralConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct PostgresConfig {
-    pub connection_url: String,
+    pub connection_url: SecStr,
+    pub alias_path: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]

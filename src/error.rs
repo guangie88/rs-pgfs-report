@@ -31,6 +31,9 @@ pub enum ErrorKind {
     #[fail(display = "Cannot execute Postgres query to get database sizes")]
     PgGetDbSizes,
 
+    #[fail(display = "Cannot unsecure connection URL")]
+    PgUnsecureUrl,
+
     #[fail(display = "Specialized logger initialization error")]
     SpecializedLoggerInit,
 

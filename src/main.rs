@@ -9,6 +9,7 @@ extern crate json_collection;
 extern crate log;
 extern crate log4rs;
 extern crate postgres;
+extern crate secstr;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -36,6 +37,7 @@ use postgres::{Connection, TlsMode};
 use std::path::Path;
 use std::process;
 use std::thread;
+use std::str;
 use structopt::StructOpt;
 
 fn db_sizes_to_storage<C, D>(
@@ -47,9 +49,7 @@ where
     C: AsRef<str>,
     D: Iterator<Item = DbSize>,
 {
-    let used = db_sizes
-        .map(|db_size| db_size.size as u64)
-        .sum();
+    let used = db_sizes.map(|db_size| db_size.size as u64).sum();
 
     StorageBuilder::default()
         .path(connection_url.as_ref())
@@ -98,10 +98,12 @@ where
 }
 
 fn create_conn(pg_conf: &PostgresConfig) -> Result<Connection> {
-    let conn =
-        Connection::connect(pg_conf.connection_url.as_str(), TlsMode::None)
-            .map_err(|e| PathError::new(&pg_conf.connection_url, e))
-            .context(ErrorKind::PgConnection)?;
+    let connection_url = str::from_utf8(pg_conf.connection_url.unsecure())
+        .context(ErrorKind::PgUnsecureUrl)?;
+
+    let conn = Connection::connect(connection_url, TlsMode::None)
+        .map_err(|e| PathError::new(connection_url, e))
+        .context(ErrorKind::PgConnection)?;
 
     Ok(conn)
 }
@@ -134,8 +136,13 @@ fn run_impl(conf: &Config) -> Result<()> {
     let conn = create_conn(&conf.pg)?;
     let db_sizes = get_db_sizes(&conn)?;
 
+    let path = match conf.pg.alias_path {
+        Some(ref alias_path) => alias_path,
+        None => "UNKNOWN",
+    };
+
     let storage = db_sizes_to_storage(
-        &conf.pg.connection_url,
+        path,
         conf.system.estimated_cap,
         db_sizes.into_iter(),
     );
