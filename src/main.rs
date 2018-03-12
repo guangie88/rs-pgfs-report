@@ -118,7 +118,7 @@ fn run(conf: &Config) -> Result<()> {
 }
 
 fn main() {
-    let conf_res = init_config::<ArgConfig, Config>();
+    let conf_res = init_config::<ArgConfig, Config, ErrorKind>();
 
     if let Err(ref e) = conf_res {
         eprintln!("{}", e);
