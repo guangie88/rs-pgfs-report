@@ -17,7 +17,5 @@ store_file_path = "/tmp/.rs-pgfs-report-store-file-path"
 
 [pg]
 # postgresql://user[:password]@host[:port][/database][?param1=val1[[&param2=val2]...]]
-connection_url = "postgresql://user:pw@localhost:5432"
-
-[system]
+connection_url = "postgresql://postgres:password@localhost:5432"
 estimated_cap = 107374182400

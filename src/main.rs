@@ -1,42 +1,34 @@
 #![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
-#[macro_use]
 extern crate failure;
 extern crate fruently;
-extern crate fs2;
-extern crate json_collection;
 #[macro_use]
 extern crate log;
-extern crate log4rs;
+extern crate mega_coll;
 extern crate postgres;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_humantime;
-extern crate simple_logger;
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
-extern crate toml;
 
 mod conf;
-mod error;
 mod pg;
-mod util;
 
-use conf::{ArgConf, Config, FluentdConfig, PostgresConfig};
-use error::{ErrorKind, PathError, QueryError, Result};
+use conf::{ArgConfig, Config};
 use failure::ResultExt;
-use fruently::fluent::Fluent;
 use fruently::forwardable::JsonForwardable;
-use fruently::retry_conf::RetryConf;
-use json_collection::{Storage, StorageBuilder};
+use mega_coll::error::{ErrorKind, Result};
+use mega_coll::error::custom::{PathError, QueryError};
+use mega_coll::json::{Storage, StorageBuilder};
+use mega_coll::util::app::{create_and_check_fluent, init_config,
+                           print_run_status};
+use mega_coll::util::fs::lock_file;
 use pg::DbSize;
 use postgres::{Connection, TlsMode};
-use std::path::Path;
 use std::process;
 use std::thread;
-use structopt::StructOpt;
 
 fn db_sizes_to_storage<C, D>(
     connection_url: C,
@@ -58,46 +50,7 @@ where
         .build()
 }
 
-fn create_and_check_fluent(f_conf: &FluentdConfig) -> Result<Fluent<&String>> {
-    let fluent_conf = RetryConf::new()
-        .max(f_conf.try_count)
-        .multiplier(f_conf.multiplier);
-
-    let fluent_conf = match f_conf.store_file_path {
-        Some(ref store_file_path) => {
-            fluent_conf.store_file(Path::new(store_file_path).to_owned())
-        }
-        None => fluent_conf,
-    };
-
-    let fluent = Fluent::new_with_conf(
-        &f_conf.address,
-        f_conf.tag.as_str(),
-        fluent_conf,
-    );
-
-    fluent
-        .clone()
-        .post("rs-pgfs-report-log-initialization")
-        .context(ErrorKind::FluentInitCheck)?;
-
-    Ok(fluent)
-}
-
-fn read_config_file<P>(conf_path: P) -> Result<Config>
-where
-    P: AsRef<Path>,
-{
-    let conf_path = conf_path.as_ref();
-
-    let config: Config = toml::from_str(&util::read_from_file(conf_path)?)
-        .map_err(|e| PathError::new(conf_path, e))
-        .context(ErrorKind::TomlConfigParse)?;
-
-    Ok(config)
-}
-
-fn create_conn(pg_conf: &PostgresConfig) -> Result<Connection> {
+fn create_conn(pg_conf: &mega_coll::conf::pg::Config) -> Result<Connection> {
     let conn =
         Connection::connect(pg_conf.connection_url.as_str(), TlsMode::None)
             .map_err(|e| PathError::new(&pg_conf.connection_url, e))
@@ -130,13 +83,16 @@ fn get_db_sizes(conn: &Connection) -> Result<Vec<DbSize>> {
 }
 
 fn run_impl(conf: &Config) -> Result<()> {
-    let fluent = create_and_check_fluent(&conf.fluentd)?;
+    let fluent = create_and_check_fluent(
+        &conf.fluentd,
+        "rs-pgfs-report-log-initialization",
+    )?;
     let conn = create_conn(&conf.pg)?;
     let db_sizes = get_db_sizes(&conn)?;
 
     let storage = db_sizes_to_storage(
         &conf.pg.connection_url,
-        conf.system.estimated_cap,
+        conf.pg.estimated_cap,
         db_sizes.into_iter(),
     );
 
@@ -150,44 +106,19 @@ fn run_impl(conf: &Config) -> Result<()> {
 
 fn run(conf: &Config) -> Result<()> {
     // to check if the process is already running as another PID
-    let _flock = util::lock_file(&conf.general.lock_file)?;
+    let _flock = lock_file(&conf.general.lock_file)?;
 
     match conf.general.repeat_delay {
         Some(repeat_delay) => loop {
-            print_run_status(&run_impl(conf));
+            print_run_status(&run_impl(conf), "Session completed!");
             thread::sleep(repeat_delay)
         },
         None => run_impl(conf),
     }
 }
 
-fn init() -> Result<Config> {
-    let arg_conf = ArgConf::from_args();
-    let conf = read_config_file(&arg_conf.conf)?;
-
-    match conf.general.log_conf_path {
-        Some(ref log_conf_path) => {
-            log4rs::init_file(log_conf_path, Default::default())
-                .map_err(|e| PathError::new(log_conf_path, e))
-                .context(ErrorKind::SpecializedLoggerInit)?
-        }
-        None => simple_logger::init().context(ErrorKind::DefaultLoggerInit)?,
-    }
-
-    Ok(conf)
-}
-
-fn print_run_status(res: &Result<()>) {
-    match *res {
-        Ok(_) => info!("Session completed!"),
-        Err(ref e) => {
-            error!("{}", e);
-        }
-    }
-}
-
 fn main() {
-    let conf_res = init();
+    let conf_res = init_config::<ArgConfig, Config>();
 
     if let Err(ref e) = conf_res {
         eprintln!("{}", e);
@@ -199,7 +130,7 @@ fn main() {
         run(&conf)
     });
 
-    print_run_status(&res);
+    print_run_status(&res, "Program completed!");
 
     if res.is_err() {
         process::exit(1);
