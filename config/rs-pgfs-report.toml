@@ -19,3 +19,10 @@ store_file_path = "/tmp/.rs-pgfs-report-store-file-path"
 # postgresql://user[:password]@host[:port][/database][?param1=val1[[&param2=val2]...]]
 connection_url = "postgresql://postgres:password@localhost:5432"
 estimated_cap = 107374182400
+
+[pg.tls_mode]
+# allowable values are None|Prefer|Require
+type = "Prefer"
+
+[pg.tls_mode.value]
+pem_files = ["config/server.crt"]

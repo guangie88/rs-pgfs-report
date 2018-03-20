@@ -19,6 +19,7 @@ mod pg;
 use conf::{ArgConfig, Config};
 use failure::ResultExt;
 use fruently::forwardable::JsonForwardable;
+use mega_coll::conf::pg::TlsModeNative;
 use mega_coll::error::{ErrorKind, Result};
 use mega_coll::error::custom::{PathError, QueryError};
 use mega_coll::json::{Storage, StorageBuilder};
@@ -50,15 +51,6 @@ where
         .build()
 }
 
-fn create_conn(pg_conf: &mega_coll::conf::pg::Config) -> Result<Connection> {
-    let conn =
-        Connection::connect(pg_conf.connection_url.as_str(), TlsMode::None)
-            .map_err(|e| PathError::new(&pg_conf.connection_url, e))
-            .context(ErrorKind::PgConnection)?;
-
-    Ok(conn)
-}
-
 fn get_db_sizes(conn: &Connection) -> Result<Vec<DbSize>> {
     const DB_SIZES_QUERY: &str =
         "SELECT pg_database.datname AS name, \
@@ -87,7 +79,25 @@ fn run_impl(conf: &Config) -> Result<()> {
         &conf.fluentd,
         "rs-pgfs-report-log-initialization",
     )?;
-    let conn = create_conn(&conf.pg)?;
+
+    let pg_conf = &conf.pg;
+
+    let conn = match pg_conf.tls_mode {
+        TlsModeNative::None => {
+            Connection::connect(pg_conf.connection_url.as_str(), TlsMode::None)
+                .map_err(|e| PathError::new(&pg_conf.connection_url, e))
+                .context(ErrorKind::PgConnection)?
+        }
+
+        TlsModeNative::Prefer(ref tls) | TlsModeNative::Require(ref tls) => {
+            Connection::connect(
+                pg_conf.connection_url.as_str(),
+                TlsMode::Prefer(tls),
+            ).map_err(|e| PathError::new(&pg_conf.connection_url, e))
+                .context(ErrorKind::PgConnection)?
+        }
+    };
+
     let db_sizes = get_db_sizes(&conn)?;
 
     let storage = db_sizes_to_storage(
