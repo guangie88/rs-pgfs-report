@@ -3,9 +3,12 @@
 extern crate failure;
 extern crate fruently;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate mega_coll;
 extern crate postgres;
+extern crate regex;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -28,8 +31,19 @@ use mega_coll::util::app::{create_and_check_fluent, init_config,
 use mega_coll::util::fs::lock_file;
 use pg::DbSize;
 use postgres::{Connection, TlsMode};
+use regex::Regex;
+use std::borrow::Cow;
 use std::process;
 use std::thread;
+
+fn mask_url(url: &str) -> Cow<str> {
+    lazy_static! {
+        static ref REP_RE: Regex = Regex::new(r"//\S*@").unwrap();
+    }
+
+    // e.g. postgresql://user:pw@localhost:5432
+    REP_RE.replace(url, "//")
+}
 
 fn db_sizes_to_storage<C, D>(
     connection_url: C,
@@ -45,7 +59,7 @@ where
         .sum();
 
     StorageBuilder::default()
-        .path(connection_url.as_ref())
+        .path(mask_url(connection_url.as_ref()))
         .capacity(cap)
         .used(used)
         .build()
@@ -144,5 +158,52 @@ fn main() {
 
     if res.is_err() {
         process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mask_url_1() {
+        let masked = mask_url("postgresql://user:pw@localhost:5432");
+        assert!(masked == "postgresql://localhost:5432");
+    }
+
+    #[test]
+    fn test_mask_url_2() {
+        let masked = mask_url("postgresql://user@localhost:5432");
+        assert!(masked == "postgresql://localhost:5432");
+    }
+
+    #[test]
+    fn test_mask_url_3() {
+        let masked = mask_url("postgresql://user:_@localhost:5432");
+        assert!(masked == "postgresql://localhost:5432");
+    }
+
+    #[test]
+    fn test_mask_url_4() {
+        let masked = mask_url("postgresql://user:@localhost:5432");
+        assert!(masked == "postgresql://localhost:5432");
+    }
+
+    #[test]
+    fn test_mask_url_5() {
+        let masked = mask_url("postgresql://localhost:5432");
+        assert!(masked == "postgresql://localhost:5432");
+    }
+
+    #[test]
+    fn test_mask_url_6() {
+        let masked = mask_url("postgresql://localhost");
+        assert!(masked == "postgresql://localhost");
+    }
+
+    #[test]
+    fn test_mask_url_7() {
+        let masked = mask_url("localhost");
+        assert!(masked == "localhost");
     }
 }
