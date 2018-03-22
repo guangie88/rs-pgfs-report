@@ -12,8 +12,8 @@ mega-coll = { git = "https://github.com/guangie88/rs-mega-coll.git", tag = "v0.3
 postgres = { version = "=0.15.2", features = ["with-native-tls"] }
 native-tls = "=0.1.5"
 regex = "=0.2.10"
-serde = "=1.0.27"
-serde_derive = "=1.0.27"
+serde = "=1.0.33"
+serde_derive = "=1.0.33"
 structopt = "=0.2.5"
 structopt-derive = "=0.2.5"
 
