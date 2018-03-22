@@ -1,5 +1,9 @@
 services:
   - docker
+
+env:
+  - DEFAULT_BRANCH=develop
+
 before_script:
   - set -e
   - if [[ "$TRAVIS_BRANCH" = "$DEFAULT_BRANCH" && "$TRAVIS_PULL_REQUEST" = "false" ]] || [ "$TRAVIS_BRANCH" = "$TRAVIS_TAG" ]; then
@@ -14,16 +18,19 @@ before_script:
   - docker-compose -f docker-compose.build.yml run build
   - docker-compose -f docker-compose.build.yml run clean
   - git reset --hard
+
 script:
   - docker-compose -f docker-compose.lint-test.yml run lint-test
 
 after_script:
   - if [ "$DO_DOCKER" = "true" ]; then
+      docker build . -t $DOCKER_USERNAME/rs-pgfs-report:$TRAVIS_BRANCH;
       docker push $DOCKER_USERNAME/rs-pgfs-report:$TRAVIS_BRANCH;
     fi
 
 branches:
   only:
     - develop
+
 notifications: null
 email: false
