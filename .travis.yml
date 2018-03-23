@@ -10,21 +10,21 @@ before_script:
       DO_DOCKER="true";
       docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
     fi
-  - docker-compose -f docker-compose.lint-test.yml build
-  - docker-compose -f docker-compose.build.yml run check
-  - docker-compose -f docker-compose.build.yml run fmt
-  - docker-compose -f docker-compose.build.yml run clippy
-  - docker-compose -f docker-compose.build.yml run build-debug
-  - docker-compose -f docker-compose.build.yml run build
-  - docker-compose -f docker-compose.build.yml run clean
-  - git reset --hard
+  # - docker-compose -f docker-compose.lint-test.yml build
+  # - docker-compose -f docker-compose.build.yml run check
+  # - docker-compose -f docker-compose.build.yml run fmt
+  # - docker-compose -f docker-compose.build.yml run clippy
+  # - docker-compose -f docker-compose.build.yml run build-debug
+  # - docker-compose -f docker-compose.build.yml run build
+  # - docker-compose -f docker-compose.build.yml run clean
+  # - git reset --hard
 
 script:
   - docker-compose -f docker-compose.lint-test.yml run lint-test
+  - docker build . -t $DOCKER_USERNAME/rs-pgfs-report:$TRAVIS_BRANCH
 
 after_script:
   - if [ "$DO_DOCKER" = "true" ]; then
-      docker build . -t $DOCKER_USERNAME/rs-pgfs-report:$TRAVIS_BRANCH;
       docker push $DOCKER_USERNAME/rs-pgfs-report:$TRAVIS_BRANCH;
     fi
 
